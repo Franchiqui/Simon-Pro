@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 // Using lucide-react as per guidelines
-import { Brain, Trophy, Info as InfoIcon, Moon, Sun, Settings as SettingsIcon, HelpCircle, ShieldCheck, FileText, Play, UserPlus, Upload, X, Camera } from 'lucide-react';
+import { Brain, Trophy, Info as InfoIcon, Moon, Sun, Settings as SettingsIcon, HelpCircle, ShieldCheck, FileText, Play, UserPlus, Upload, X } from 'lucide-react';
 
 type Color = 'green' | 'red' | 'yellow' | 'blue';
 
@@ -24,7 +24,6 @@ export default function App() {
   const [gameState, setGameState] = useState < 'idle' | 'playing' | 'gameOver' > ('idle');
   const [highScore, setHighScore] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
 
   const audioContextRef = useRef < AudioContext | null > (null);
 
@@ -154,13 +153,6 @@ export default function App() {
                 className="p-4 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
               >
                 {isDarkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-              </button>
-              <button
-                onClick={() => setIsPlayerModalOpen(true)}
-                className="p-4 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-                title="Inscribir jugador"
-              >
-                <UserPlus className="w-6 h-6" />
               </button>
               <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-300 dark:border-slate-700">
                 <img
