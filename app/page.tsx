@@ -1,11 +1,18 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 // Using lucide-react as per guidelines
-import { Brain, Trophy, Info as InfoIcon, Moon, Sun, Settings as SettingsIcon, HelpCircle, ShieldCheck, FileText, Play, UserPlus, Upload, X } from 'lucide-react';
+import { Brain, Trophy, Info as InfoIcon, Moon, Sun, Settings as SettingsIcon, HelpCircle, ShieldCheck, FileText, Play, UserPlus, Upload, X, Camera } from 'lucide-react';
 
 type Color = 'green' | 'red' | 'yellow' | 'blue';
+
+type RegisteredPlayer = {
+  id: string;
+  name: string;
+  score: number;
+  avatarSrc: string;
+};
 
 const COLORS: Color[] = ['green', 'red', 'yellow', 'blue'];
 
@@ -16,6 +23,12 @@ const FREQUENCIES: Record<Color, number> = {
   blue: 523.25,
 };
 
+const INITIAL_PLAYERS: RegisteredPlayer[] = [
+  { id: '1', name: 'TurboMax', score: 42, avatarSrc: 'https://api.dicebear.com/7.x/avataaars/svg?seed=1' },
+  { id: '2', name: 'NeonCat', score: 38, avatarSrc: 'https://api.dicebear.com/7.x/avataaars/svg?seed=2' },
+  { id: '3', name: 'MemoryMaster', score: 35, avatarSrc: 'https://api.dicebear.com/7.x/avataaars/svg?seed=3' },
+];
+
 export default function App() {
   const [sequence, setSequence] = useState < Color[] > ([]);
   const [userSequence, setUserSequence] = useState < Color[] > ([]);
@@ -24,6 +37,11 @@ export default function App() {
   const [gameState, setGameState] = useState < 'idle' | 'playing' | 'gameOver' > ('idle');
   const [highScore, setHighScore] = useState(0);
   const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isPlayerModalOpen, setIsPlayerModalOpen] = useState(false);
+  const [playerName, setPlayerName] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [registeredPlayers, setRegisteredPlayers] = useState<RegisteredPlayer[]>(INITIAL_PLAYERS);
+  const [currentPlayerId, setCurrentPlayerId] = useState(INITIAL_PLAYERS[0]?.id ?? '');
 
   const audioContextRef = useRef < AudioContext | null > (null);
 
@@ -122,11 +140,60 @@ export default function App() {
   };
 
   const handleGameOver = () => {
+    const finalScore = sequence.length * 10;
     playErrorTone();
     setGameState('gameOver');
     setSequence([]);
     setUserSequence([]);
+    setRegisteredPlayers(prev => prev.map(player =>
+      player.id === currentPlayerId
+        ? { ...player, score: Math.max(player.score, finalScore) }
+        : player
+    ));
   };
+
+  const handleClosePlayerModal = () => {
+    setPlayerName('');
+    setAvatarFile(null);
+    setIsPlayerModalOpen(false);
+  };
+
+  const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handlePlayerSignupSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedName = playerName.trim();
+    if (!trimmedName) return;
+
+    const avatarSrc = avatarFile
+      ? await readFileAsDataUrl(avatarFile)
+      : `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(trimmedName)}`;
+
+    const newPlayerId = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
+    setRegisteredPlayers(prevPlayers => {
+      const nextPlayer: RegisteredPlayer = {
+        id: newPlayerId,
+        name: trimmedName,
+        score: Math.max(highScore, sequence.length) * 10,
+        avatarSrc,
+      };
+      return [nextPlayer, ...prevPlayers].slice(0, 10);
+    });
+    setCurrentPlayerId(newPlayerId);
+
+    setPlayerName('');
+    setAvatarFile(null);
+    setIsPlayerModalOpen(false);
+  };
+
+  const sortedPlayers = useMemo(() => [...registeredPlayers].sort((a, b) => b.score - a.score), [registeredPlayers]);
+  const activePlayer = sortedPlayers.find(p => p.id === currentPlayerId);
+  const activePlayerRank = activePlayer ? sortedPlayers.findIndex(p => p.id === currentPlayerId) + 1 : undefined;
 
   return (
     <div className={`${isDarkMode ? 'dark' : ''} min-h-screen transition-colors duration-300`}>
@@ -154,6 +221,13 @@ export default function App() {
               >
                 {isDarkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
               </button>
+              <button
+                onClick={() => setIsPlayerModalOpen(true)}
+                className="p-4 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                title="Inscribir jugador"
+              >
+                <UserPlus className="w-6 h-6" />
+              </button>
               <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-300 dark:border-slate-700">
                 <img
                   src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
@@ -179,17 +253,12 @@ export default function App() {
                 </div>
                 <div className="p-2">
                   <div className="space-y-1">
-                    {[
-                      { name: 'TurboMax', score: 42, rank: '01', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=1' },
-                      { name: 'NeonCat', score: 38, rank: '02', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=2' },
-                      { name: 'MemoryMaster', score: 35, rank: '03', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=3' },
-                      { name: 'CircuitBox', score: 31, rank: '04', img: 'https://api.dicebear.com/7.x/avataaars/svg?seed=4' },
-                    ].map((player) => (
-                      <div key={player.rank} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                    {sortedPlayers.map((player, index) => (
+                      <div key={player.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                         <div className="flex items-center gap-3">
-                          <span className="font-display text-xs text-slate-400 w-4">{player.rank}</span>
+                          <span className="font-display text-xs text-slate-400 w-4">{index + 1}</span>
                           <img
-                            src={player.img}
+                            src={player.avatarSrc}
                             alt={player.name}
                             className="w-8 h-8 rounded-full bg-slate-200"
                             referrerPolicy="no-referrer"
@@ -280,7 +349,7 @@ export default function App() {
                 <div className="absolute -z-10 w-full h-full max-w-lg max-h-lg bg-blue-600/10 blur-[100px] rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
               </div>
 
-              <div className="text-center h-8">
+              <div className="text-center mt-4">
                 <AnimatePresence mode="wait">
                   {gameState === 'gameOver' && (
                     <motion.p
@@ -302,6 +371,15 @@ export default function App() {
                     </motion.p>
                   )}
                 </AnimatePresence>
+              </div>
+
+              {/* Active player info */}
+              <div className="mt-4 text-center text-sm">
+                Jugador actual:
+                <strong className="ml-1">
+                  {activePlayer?.name ?? 'Anónimo'}
+                </strong>
+                <span className="ml-2 text-slate-400">(#{activePlayerRank ?? '-'})</span>
               </div>
             </div>
 
@@ -343,7 +421,63 @@ export default function App() {
             </aside>
           </div>
         </main>
+
+        {/* Player signup modal */}
+        {isPlayerModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div
+              className="absolute inset-0 bg-black/60"
+              aria-hidden="true"
+              onClick={handleClosePlayerModal}
+            />
+            <div className="relative z-10 w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 p-6 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Inscribir jugador</h3>
+                <button
+                  onClick={handleClosePlayerModal}
+                  aria-label="Cerrar"
+                  className="text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                Registra tu nombre para aparecer en las clasificaciones y recibir notificaciones de logros.
+              </p>
+              <form onSubmit={handlePlayerSignupSubmit} className="space-y-4">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Nombre completo
+                  <input
+                    value={playerName}
+                    onChange={(event) => setPlayerName(event.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                    placeholder="Tu nombre"
+                    required
+                  />
+                </label>
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Sube tu avatar
+                  <input
+                    type="file"
+                    accept="image/*"
+                    value={avatarFile ? undefined : ''}
+                    onChange={(event) => setAvatarFile(event.target.files?.[0] ?? null)}
+                    className="mt-2 w-full cursor-pointer rounded-xl border border-dashed border-slate-300 bg-white px-4 py-2 text-slate-900 focus:border-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-white"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold uppercase text-white shadow-lg shadow-blue-600/30 transition hover:bg-blue-500"
+                >
+                  Enviar inscripción
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+
